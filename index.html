@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Load data from an external GeoJSON file</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+            flex-direction: row;
+            align-items: stretch;
+        }
+
+        #table {
+            flex-basis: 500px;
+            overflow-y: scroll;
+        }
+
+        #map {
+            flex-grow: 1;
+        }
+
+        button {
+            margin-bottom: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 100%;
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 16px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        @media screen and (max-width: 1024px) {
+            #table {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main id="container">
+        <div id="map"></div>
+
+        <div id="table">
+            <h2>US Cities</h2>
+            <button onclick="sortTable()">Sort by Population</button>
+
+            <table>
+                <tr>
+                    <th>Name</th>
+                    <th>States</th>
+                    <th>Population</th>
+                </tr>
+            </table>
+
+        </div>
+
+    </main>
+    <script>
+        let usCities;
+
+        mapboxgl.accessToken =
+            'pk.eyJ1Ijoicml0YWFhYWEiLCJhIjoiY2t2MzNsNjJ6MXF0ajJ2dGNtbDNpMnZvcyJ9.LpoVXd_IP_Pay3r0rsiWEg';
+        const map = new mapboxgl.Map({
+            container: 'map', // container ID
+            style: 'mapbox://styles/mapbox/dark-v10', // style URL
+            zoom: 2, // starting zoom
+            center: [-103.47063168964335, 40.2341563245446] // starting center
+        });
+
+        async function geojsonFetch() {
+            let response = await fetch('assets/us_cities.geojson');
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            usCities = await response.json();
+
+            response = await fetch('assets/states.geojson');
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            let us = await response.json();
+
+            var table = document.getElementsByTagName("table");
+
+            for (let i = 0; i < usCities.features.length; i++) {
+                var lng = await usCities.features[i].geometry.coordinates[0];
+                var lat = await usCities.features[i].geometry.coordinates[1];
+
+                // Create an empty <tr> element and add it to the 1st position of the table:
+                var row = table[0].insertRow(-1);
+
+                var cell1 = row.insertCell(0);
+                var cell2 = row.insertCell(1);
+                var cell3 = row.insertCell(2);
+                cell1.innerHTML = await usCities.features[i].properties.name.split(' ').slice(0, -1).join(' ')
+                cell2.innerHTML = await usCities.features[i].properties['country.etc'];
+                cell3.innerHTML = await usCities.features[i].properties.pop;
+            }
+
+            map.on('load', () => {
+                map.addSource('us', {
+                    type: 'geojson',
+                    data: us
+                });
+
+                map.addLayer({
+                    'id': 'us-layer',
+                    'type': 'fill',
+                    'source': 'us',
+                    'paint': {
+                        'fill-color': '#0080ff', // blue color fill
+                        'fill-opacity': 0.5
+                    }
+                });
+
+                map.addSource('usCities', {
+                    type: 'geojson',
+                    data: usCities
+                });
+
+                map.addLayer({
+                    'id': 'usCities-layer',
+                    'type': 'circle',
+                    'source': 'usCities',
+                    'paint': {
+                        'circle-radius': 8,
+                        'circle-stroke-width': 2,
+                        'circle-color': 'red',
+                        'circle-stroke-color': 'white'
+                    }
+                });
+            });
+        }
+
+        geojsonFetch()
+            .catch(e => {
+                console.log('There has been a problem with your fetch operation: ' + e.message);
+            });
+
+        function sortTable() {
+            let table = document.getElementsByTagName("table")[0];
+            usCities = usCities.features.sort((a, b) => b.properties.pop - a.properties.pop)
+            usCities.forEach((city, index) => {
+                table.rows[index + 1].getElementsByTagName("td")[0].innerHTML = city.properties.name.split(' ').slice(0, -1).join(' ')
+                table.rows[index + 1].getElementsByTagName("td")[1].innerHTML = city.properties['country.etc']
+                table.rows[index + 1].getElementsByTagName("td")[2].innerHTML = city.properties.pop
+            })
+        }
+    </script>
+</body>
+
+</html>
